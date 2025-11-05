@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>xfr.ibm.com</groupId>
-    <artifactId>ToDecahedron</artifactId>
-    <version>0.0.1</version>
+    <artifactId>TokenDetector</artifactId>
+    <version>0.2.0</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

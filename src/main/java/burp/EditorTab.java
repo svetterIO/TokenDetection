@@ -2,7 +2,10 @@ package burp;
 
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
-import burp.api.montoya.ui.settings.SettingsPanel;
+import burp.api.montoya.ui.settings.SettingsPanelBuilder;
+import burp.api.montoya.ui.settings.SettingsPanelPersistence;
+import burp.api.montoya.ui.settings.SettingsPanelSetting;
+import burp.api.montoya.ui.settings.SettingsPanelWithData;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -15,37 +18,101 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class EditorTab implements BurpExtension {
+    private SettingsPanelWithData settings;
 
     @Override
     public void initialize(MontoyaApi api) {
-        api.extension().setName("ToDecahedron");
-        api.logging().logToOutput("Author: Philipp Röder");
-        api.logging().logToOutput("Version: " + loadVersion());
+        api.extension().setName("Token Detector");
 
-        // NEW: make settings globally available
-        TokenSettings.init(api);
-
-        api.proxy().registerRequestHandler(new TokenProxyHandler());
-        api.http().registerHttpHandler(new TokenHttpHandler());
-
-        // Option B: settings panel
-        api.userInterface().registerSettingsPanel(new TokenSettingsPanel(api));
+        logHeader(api);
+        setupSettings(api);
+        registerHandlers(api);
     }
 
-    private String loadVersion() {
+    private void logHeader(MontoyaApi api) {
+        api.logging().logToOutput("====================================================");
+        api.logging().logToOutput(" Project Information");
+        api.logging().logToOutput("====================================================");
+        api.logging().logToOutput(" Author       : Philipp Röder, Sebastian Vetter");
+        api.logging().logToOutput(" Contributors : Kartik Rastogi");
+        api.logging().logToOutput(" Version      : " + loadVersion(api));
+        api.logging().logToOutput("====================================================");
+        api.logging().logToOutput(" Further logging below on found token...");
+        api.logging().logToOutput("====================================================");
+    }
+
+    /**
+     * Builds and registers the settings panel for the extension.
+     */
+    private void setupSettings(MontoyaApi api) {
+        settings = SettingsPanelBuilder.settingsPanel()
+                .withPersistence(SettingsPanelPersistence.USER_SETTINGS)
+                .withTitle("Token Detection Settings")
+                .withDescription(
+                    "Toggle request marking. \n" +
+                    "For colors, only the following names are supported: NONE, RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, PINK, MAGENTA, GRAY."
+                )
+                .withSettings(
+                        // Global toggle
+                        SettingsPanelSetting.booleanSetting("markRequests", true),
+
+                        // PASETO
+                        SettingsPanelSetting.stringSetting(
+                                "PASETO_PATTERN",
+                                "v[0-9]\\.(local|public)\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)?"
+                        ),
+                        SettingsPanelSetting.stringSetting(
+                                "PASETO_COLOR",
+                                "GREEN"
+                        ),
+
+                        // LTPA2
+                        SettingsPanelSetting.stringSetting(
+                                "LTPA2_PATTERN",
+                                "(?i)LtpaToken2="
+                        ),
+                        SettingsPanelSetting.stringSetting(
+                                "LTPA2_COLOR",
+                                "RED"
+                        ),
+
+                        // JWT
+                        SettingsPanelSetting.stringSetting(
+                                "JWT_PATTERN",
+                                "eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+                        ),
+                        SettingsPanelSetting.stringSetting(
+                                "JWT_COLOR",
+                                "ORANGE"
+                        )
+                )
+                .build();
+
+        api.userInterface().registerSettingsPanel(settings);
+    }
+
+    private void registerHandlers(MontoyaApi api) {
+        api.proxy().registerRequestHandler(new TokenProxyHandler(settings, api));
+        api.http().registerHttpHandler(new TokenHttpHandler(settings, api));
+    }
+
+    private String loadVersion(MontoyaApi api) {
         try (InputStream input = getClass().getClassLoader().getResourceAsStream("version.properties")) {
-            Properties props = new Properties();
             if (input != null) {
+                Properties props = new Properties();
                 props.load(input);
                 return props.getProperty("version", "Unknown");
+            } else {
+                api.logging().logToOutput("[!] version.properties not found – using fallback.");
+                return "Unknown";
             }
-        } catch (Exception ignored) {}
-        return "Error";
+        } catch (Exception e) {
+            api.logging().logToOutput("[!] Failed to load version.properties: " + e.getMessage());
+            return "Unknown";
+        }
     }
 
-    /* ===== Types moved here so they're available everywhere ===== */
-    public enum Colour { RED, GREEN, BLUE, YELLOW, MAGENTA, CYAN, ORANGE, GRAY }
-
-
-
+    public SettingsPanelWithData getSettingsPanel() {
+        return settings;
+    }
 }

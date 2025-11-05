@@ -22,7 +22,7 @@ public class EditorTab implements BurpExtension {
 
     @Override
     public void initialize(MontoyaApi api) {
-        api.extension().setName("Token Detector");
+        api.extension().setName("ToDecaedron");
 
         logHeader(api);
         setupSettings(api);
